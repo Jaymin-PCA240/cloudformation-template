@@ -1,0 +1,41 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo "Installing AWS CLI if not present..."
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip -q awscliv2.zip
+      - sudo ./aws/install
+
+  pre_build:
+    commands:
+      - echo "Starting pre-build..."
+      - export BUCKET_NAME=$ARTIFACT_BUCKET
+      - echo "Bucket is: $BUCKET_NAME"
+
+  build:
+    commands:
+      - echo "Packaging nested stacks..."
+      # Copy nested templates to S3
+      - aws s3 cp ./nested-stacks/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./nested-stacks/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./nested-stacks/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./nested-stacks/security-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - echo "Nested stacks uploaded successfully."
+
+  post_build:
+    commands:
+      - echo "Preparing artifacts for CloudFormation..."
+      # Create output folder for pipeline artifacts
+      - mkdir -p output
+      # Copy root template into output so pipeline CFN deploys it
+      - cp root-template-main.yaml output/
+      - echo "Build completed on `date`"
+
+artifacts:
+  files:
+    - output/root-template-main.yaml
+  discard-paths: yes
