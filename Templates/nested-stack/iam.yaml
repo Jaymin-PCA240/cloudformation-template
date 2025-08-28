@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "IAM Role + InstanceProfile for EC2 (separate stack)"
+
+Parameters:
+  InstanceRoleName:
+    Type: String
+    Default: cf-app-ec2-role
+
+Resources:
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref InstanceRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${InstanceRoleName}-ip"
+      Roles:
+        - !Ref EC2InstanceRole
+
+Outputs:
+  InstanceProfileName:
+    Description: EC2 Instance Profile name
+    Value: !Ref EC2InstanceProfile
+
+  InstanceRoleArn:
+    Description: EC2 Role ARN
+    Value: !GetAtt EC2InstanceRole.Arn

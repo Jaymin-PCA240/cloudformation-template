@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Bastion Host Stack integrated with VPC + Private Subnets"
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: "VPC for Bastion and private instances"
+
+  PublicSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: "Public subnet where Bastion host will reside"
+
+  AllowedSSHLocation:
+    Type: String
+    Default: "203.0.113.0/32"
+    Description: "CIDR from which SSH is allowed"
+
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: "Existing EC2 KeyPair name for SSH access"
+
+  LatestAL2023Ami:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.12-x86_64'
+
+Resources:
+
+  # Security Group for Bastion
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for Bastion Host"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSSHLocation
+      Tags:
+        - Key: Name
+          Value: "BastionSG"
+
+  # IAM Role for Bastion (SSM access)
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionRole
+
+  # Bastion Host EC2
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      KeyName: !Ref EC2KeyPair
+      ImageId: !Ref LatestAL2023Ami
+      SubnetId: !Ref PublicSubnetId
+      SecurityGroupIds:
+        - !Ref BastionSG
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      Tags:
+        - Key: Name
+          Value: "BastionHost"
+
+  # Security Group to allow Bastion to access private instances
+  BastionToPrivateSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow Bastion to access private instances"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: !Ref BastionSG
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref BastionSG
+      Tags:
+        - Key: Name
+          Value: "BastionToPrivateSG"
+
+Outputs:
+  BastionHostId:
+    Description: "Bastion Host EC2 ID"
+    Value: !Ref BastionHost
+
+  BastionPublicIP:
+    Description: "Public IP of Bastion Host"
+    Value: !GetAtt BastionHost.PublicIp
+
+  BastionSGId:
+    Description: "Security Group ID for Bastion"
+    Value: !Ref BastionSG
+
+  BastionToPrivateSGId:
+    Description: "Security Group ID for Bastion access to private instances"
+    Value: !Ref BastionToPrivateSG

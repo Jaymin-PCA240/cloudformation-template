@@ -1,0 +1,278 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AppStack: ALB, ECS Fargate Service, CodePipeline"
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: Jaymin-PCA240/Docker-NodeJS-EC2
+  GitHubBranch:
+    Type: String
+    Default: main
+  GitHubConnectionArn:
+    Type: String
+    Default: arn:aws:codeconnections:ap-south-1:127145910156:connection/1db5596b-8712-48b6-aad2-062695c51177
+  ECRRepoUri:
+    Type: String
+    Default: 127145910156.dkr.ecr.ap-south-1.amazonaws.com/docker/nodejs:latest
+  ContainerPort:
+    Type: Number
+    Default: 3000
+  ClusterName:
+    Type: String
+    Default: NodeAppCluster
+  DeploymentType:
+    Type: String
+    Default: DirectECS
+    AllowedValues:
+      - DirectECS
+      - CodeDeployECS
+    Description: Select ECS deployment type (DirectECS or CodeDeployECS)
+
+Resources:
+  # Nested Stack: VPC
+  VPCStack1:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "https://nested-stack-yaml.s3.ap-south-1.amazonaws.com/vpc.yaml"
+      Parameters:
+        VpcCidr: 10.0.0.0/16
+
+  # Nested Stack: Roles
+  RoleStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: "https://nested-stack-yaml.s3.ap-south-1.amazonaws.com/RoleStack.yaml"
+      Parameters:
+        DeploymentType: !Ref DeploymentType
+
+  # Security Groups
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB SG
+      VpcId: !GetAtt VPCStack1.Outputs.VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  ECSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS SG
+      VpcId: !GetAtt VPCStack1.Outputs.VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          SourceSecurityGroupId: !Ref ALBSG
+
+  # ALB
+  AppALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - !GetAtt VPCStack1.Outputs.PublicSubnet1
+        - !GetAtt VPCStack1.Outputs.PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSG
+      Scheme: internet-facing
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: !Ref ContainerPort
+      Protocol: HTTP
+      VpcId: !GetAtt VPCStack1.Outputs.VpcId
+      TargetType: ip
+      HealthCheckPath: /
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref AppALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ECS Cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+
+  # ECS Task Definition
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ClusterName}-task"
+      Cpu: 256
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt RoleStack.Outputs.ECSTaskExecutionRoleArn
+      ContainerDefinitions:
+        - Name: nodejs
+          Image: !Ref ECRRepoUri
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+
+  # ECS Service
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: Listener
+    Properties:
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref ECSTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 2
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !GetAtt VPCStack1.Outputs.PublicSubnet1
+            - !GetAtt VPCStack1.Outputs.PublicSubnet2
+          SecurityGroups:
+            - !Ref ECSSG
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroup
+          ContainerName: nodejs
+          ContainerPort: !Ref ContainerPort
+
+  ### ADDED for CodeDeployECS ###
+  CodeDeployECSApp:
+    Type: AWS::CodeDeploy::Application
+    Condition: IsCodeDeployECS
+    Properties:
+      ComputePlatform: ECS
+
+  CodeDeployECSDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Condition: IsCodeDeployECS
+    Properties:
+      ApplicationName: !Ref CodeDeployECSApp
+      DeploymentGroupName: !Sub "${AWS::StackName}-DeploymentGroup"
+      ServiceRoleArn: !GetAtt RoleStack.Outputs.CodeDeployRoleArn
+      DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+      DeploymentStyle:
+        DeploymentType: BLUE_GREEN
+        DeploymentOption: WITH_TRAFFIC_CONTROL
+      BlueGreenDeploymentConfiguration:
+        TerminateBlueInstancesOnDeploymentSuccess:
+          Action: TERMINATE
+          TerminationWaitTimeInMinutes: 1
+      LoadBalancerInfo:
+        TargetGroupPairInfoList:
+          - TargetGroups:
+              - Name: !GetAtt TargetGroup.TargetGroupName
+            ProdTrafficRoute:
+              ListenerArns:
+                - !Ref Listener
+      ECSService:
+        ClusterName: !Ref ECSCluster
+        ServiceName: !Ref ECSService
+      AutoRollbackConfiguration:
+        Enabled: true
+        Events:
+          - DEPLOYMENT_FAILURE
+
+  # CodeBuild Project
+  NodeAppCodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: NodeAppBuild
+      Source:
+        Type: CODEPIPELINE
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+      ServiceRole: !GetAtt RoleStack.Outputs.CodeBuildRoleArn
+
+  # CodePipeline
+  NodeAppPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: NodeAppPipeline
+      RoleArn: !GetAtt RoleStack.Outputs.CodePipelineRoleArn
+      ArtifactStore:
+        Type: S3
+        Location: cicd-asg-pipelineartifactbucket-xp5oa3woeztb
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: 1
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Ref GitHubRepo
+                BranchName: !Ref GitHubBranch
+                DetectChanges: true
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref NodeAppCodeBuild
+        - Name: Deploy
+          Actions:
+            - !If
+              - IsDirectECS
+              - Name: ECSDeploy
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: ECS
+                  Version: 1
+                InputArtifacts:
+                  - Name: BuildOutput
+                Configuration:
+                  ClusterName: !Ref ECSCluster
+                  ServiceName: !Ref ECSService
+                  FileName: imagedefinitions.json
+              - !Ref AWS::NoValue
+            - !If
+              - IsCodeDeployECS
+              - Name: CodeDeployECS
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Provider: CodeDeploy
+                  Version: 1
+                InputArtifacts:
+                  - Name: BuildOutput
+                Configuration:
+                  ApplicationName: !Ref CodeDeployECSApp
+                  DeploymentGroupName: !Ref CodeDeployECSDeploymentGroup
+              - !Ref AWS::NoValue
+
+Conditions:
+  IsDirectECS: !Equals [!Ref DeploymentType, "DirectECS"]
+  IsCodeDeployECS: !Equals [!Ref DeploymentType, "CodeDeployECS"]
+
+Outputs:
+  ALBDNS:
+    Value: !GetAtt AppALB.DNSName
+  DeploymentTypeSelected:
+    Value: !Ref DeploymentType

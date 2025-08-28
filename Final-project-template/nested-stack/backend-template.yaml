@@ -1,0 +1,303 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  CI/CD Pipeline: GitHub (CodeStar Connection) -> CodeBuild -> CodeDeploy (deploy to EC2 + ALB + ASG)
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Description: GitHub repo name
+    Default: Jaymin-PCA240/BE-TODO
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Branch to build
+  GitHubConnectionArn:
+    Type: String
+    Description: ARN of existing CodeStar GitHub connection
+    Default: arn:aws:codeconnections:ap-south-1:127145910156:connection/1db5596b-8712-48b6-aad2-062695c51177
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 KeyPair name for SSH access
+  VPCId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for EC2 instance
+  PublicSubnetId1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet ID 1 for EC2 instance
+  PublicSubnetId2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet ID 2 for EC2 instance
+  PrivateSubnetId1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet ID 1 for EC2 instance
+  PrivateSubnetId2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet ID 2 for EC2 instance
+  DatabaseEndpoint:
+    Type: String
+    Description: RDS or Aurora DB endpoint (hostname only, no protocol/port)
+  DatabaseName:
+    Type: String
+    Default: tododb
+  EC2SecurityGroup:
+    Type: String
+  ALBSecurityGroup:
+    Type: String
+  LatestAL2023Ami:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.12-x86_64'
+  BackendDbSecret:
+    Type: String
+  CodePipelineRoleArn:
+    Type: String
+  EC2InstanceProfileName:
+    Type: String
+  CodeBuildRoleArn:
+    Type: String
+  CodeDeployServiceRoleArn:
+    Type: String
+  PipelineArtifactBucketName:
+    Type: String
+
+Resources:
+  
+  # ALB Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "node-alb"
+      Subnets:
+        - !Ref PublicSubnetId1
+        - !Ref PublicSubnetId2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Scheme: internet-facing
+      Type: application
+
+  # Target Group for ALB
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      # Name: !Sub "${GitHubRepo}-TG"
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !Ref VPCId
+      HealthCheckPath: /health
+      TargetType: instance
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 10  
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+
+  # ALB Listener on port 80
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+  
+  # Launch Template for ASG with userdata for CodeDeploy agent and Docker
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref LatestAL2023Ami # Amazon Linux 2 Mumbai
+        InstanceType: t3.micro
+        IamInstanceProfile:
+          Name: !Ref EC2InstanceProfileName
+        KeyName: !Ref EC2KeyPair
+        SecurityGroupIds:
+          - !Ref EC2SecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -e
+
+            # Update system
+            dnf update -y
+
+            # Install Node.js 18.x
+            curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+            dnf install -y nodejs git jq awscli
+
+            # Install Amazon CloudWatch Agent (comes from repo)
+            dnf install -y amazon-cloudwatch-agent
+
+            # Install PM2 globally
+            npm install -g pm2
+
+            # Install CodeDeploy agent
+            dnf install -y ruby wget
+            cd /home/ec2-user
+            wget https://aws-codedeploy-${AWS::Region}.s3.${AWS::Region}.amazonaws.com/latest/install
+            chmod +x ./install
+            ./install auto
+            systemctl enable --now codedeploy-agent
+
+            # Create app directory
+            mkdir -p /home/ec2-user/app
+            cd /home/ec2-user/app
+
+            # Fetch DB secret from Secrets Manager
+            SECRET_ID=${BackendDbSecret}
+            SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id $SECRET_ID --query SecretString --output text --region ${AWS::Region})
+
+            DB_USERNAME=$(echo $SECRET_VALUE | jq -r .username)
+            DB_PASSWORD=$(echo $SECRET_VALUE | jq -r .password)
+
+            # Create .env file
+            cat <<EOF > /home/ec2-user/app/.env
+            NODE_ENV=development
+            DATABASE_URL="mysql://$DB_USERNAME:$DB_PASSWORD@${DatabaseEndpoint}:3306/${DatabaseName}"
+            PORT=8080
+            EOF
+
+            # Set permissions
+            chown -R ec2-user:ec2-user /home/ec2-user/app
+            chmod 600 /home/ec2-user/app/.env
+
+            aws ssm get-parameter \
+              --name "/ec2/cloudwatch/agent/config" \
+              --region ${AWS::Region} \
+              --with-decryption \
+              --query "Parameter.Value" \
+              --output text > /opt/aws/amazon-cloudwatch-agent/bin/config.json
+
+            # Start CloudWatch Agent
+            /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+              -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
+
+  # Auto Scaling Group
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnetId1
+        - !Ref PrivateSubnetId2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: 2
+      MaxSize: 4
+      DesiredCapacity: 2
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${GitHubRepo}-ASG"
+          PropagateAtLaunch: true
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 600
+
+  # CodeDeploy Application
+  CodeDeployApp:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ComputePlatform: Server
+
+  # CodeDeploy Deployment Group for ASG and ALB
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    DependsOn: CodeDeployApp
+    Properties:
+      ApplicationName: !Ref CodeDeployApp
+      DeploymentGroupName: !Sub "DeploymentGroup"
+      ServiceRoleArn: !Ref CodeDeployServiceRoleArn
+      AutoScalingGroups:
+        - !Ref AutoScalingGroup
+      LoadBalancerInfo:
+        TargetGroupInfoList:
+          - Name: !GetAtt TargetGroup.TargetGroupName
+      DeploymentConfigName: CodeDeployDefault.AllAtOnce
+
+  # CodeBuild Project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub "BuildProject"
+      ServiceRole: !Ref CodeBuildRoleArn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:6.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true # required for Docker
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 30
+
+  # CodePipeline Definition
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !Ref CodePipelineRoleArn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucketName
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: 1
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Sub "${GitHubRepo}"
+                BranchName: !Ref GitHubBranch
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+        - Name: Approval   # <-- NEW stage
+          Actions:
+            - Name: ManualApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              RunOrder: 1
+              Configuration:
+                CustomData: "Please review the build artifacts before deployment."
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: 1
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ApplicationName: !Ref CodeDeployApp
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+
+Outputs:
+  LoadBalancerDNS:
+    Description: "Load Balancer DNS Name"
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+
+  AutoScalingGroupName:
+    Description: "Auto Scaling Group Name"
+    Value: !Ref AutoScalingGroup

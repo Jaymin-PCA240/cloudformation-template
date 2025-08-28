@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Launch EC2 with SSH (22) and show public IP in Apache page
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+    Description: Choose EC2 instance type
+
+Mappings:
+  RegionMap:
+    ap-south-1:
+      AMI: ami-0144277607031eca2 # Mumbai
+    us-east-1:
+      AMI: ami-0de716d6197524dd9 # N. Virginia
+    us-west-1:
+      AMI: ami-06e11c4cc68c362dd # California
+
+Resources:
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref AWS::Region
+        - AMI
+      SecurityGroupIds:
+        - !Ref MySecurityGroup
+      Tags:
+        - Key: Name
+          Value: TestEC2
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install -y httpd
+          sudo systemctl enable httpd
+          sudo systemctl start httpd
+          PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+          echo "<h1>My Public IP is: ${PUBLIC_IP}</h1>" | sudo tee /var/www/html/index.html
+
+Outputs:
+  PublicIP:
+    Description: Public IP of the instance
+    Value: !GetAtt MyEC2Instance.PublicIp
