@@ -6,12 +6,6 @@ Parameters:
     Type: String
   SubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
-  DBUsername:
-    Type: String
-    Default: admin
-  DBPassword:
-    Type: String
-    NoEcho: true
   DatabaseName:
     Type: String
     Default: tododb

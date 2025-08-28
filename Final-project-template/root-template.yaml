@@ -48,7 +48,7 @@ Resources:
   BackendDbSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub "${AWS::StackName}-BackendDbSecret"
+      # Name: !Sub "${AWS::StackName}-BackendDbSecret"
       Description: "Secret for backend RDS database"
       GenerateSecretString:
         SecretStringTemplate: !Sub '{"username": "${DBUsername}" }' 
