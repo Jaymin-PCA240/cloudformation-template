@@ -28,6 +28,14 @@ Parameters:
     Type: String
     Default: main
     Description: Branch to build for FE
+  GitHubRepo:
+    Type: String
+    Description: GitHub repo name
+    Default: Jaymin-PCA240/BE-TODO
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Branch to build
   GitHubConnectionArn:
     Type: String
     Description: ARN of existing CodeStar GitHub connection
