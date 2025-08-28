@@ -13,7 +13,6 @@ Resources:
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "${AWS::StackName}-pipeline-artifacts-${AWS::AccountId}-${AWS::Region}"
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
