@@ -35,6 +35,13 @@ Parameters:
   AlarmEmail:
     Type: String
     Description: Email address to receive alarm notifications
+  DatabaseType:
+    Type: String
+    Default: mysql
+    AllowedValues:
+      - mysql
+      - aurora
+    Description: "Choose which database to deploy: mysql or aurora"
 
 Resources:
 
@@ -77,10 +84,23 @@ Resources:
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
 
-  AuroraStack:
+  MySQLStack:
     Type: AWS::CloudFormation::Stack
+    Condition: UseMySQL
     Properties:
       TemplateURL: "https://todo-nested-stack.s3.ap-south-1.amazonaws.com/mysql-template.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
+        DatabaseName: !Ref DatabaseName
+        DBSecurityGroup: !GetAtt SecurityStack.Outputs.DBSecurityGroupId
+        BackendDbSecret: !Ref BackendDbSecret
+
+  AuroraStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: UseAurora
+    Properties:
+      TemplateURL: "https://todo-nested-stack.s3.ap-south-1.amazonaws.com/aurora-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
@@ -99,7 +119,10 @@ Resources:
         PrivateSubnetId1: !GetAtt VPCStack.Outputs.PrivateSubnet1
         PrivateSubnetId2: !GetAtt VPCStack.Outputs.PrivateSubnet2
         EC2KeyPair: !Ref EC2KeyPair
-        DatabaseEndpoint: !GetAtt AuroraStack.Outputs.DBEndpoint
+        DatabaseEndpoint: !If
+          - UseMySQL
+          - !GetAtt MySQLStack.Outputs.DBEndpoint
+          - !GetAtt AuroraStack.Outputs.DBEndpoint
         DatabaseName: !Ref DatabaseName
         GitHubRepo: !Ref GitHubRepoBE
         GitHubBranch: !Ref GitHubBranchBE
@@ -133,8 +156,15 @@ Resources:
       Parameters:
         MyASG: !GetAtt BackendStack.Outputs.AutoScalingGroupName
         ALBDNS: !GetAtt BackendStack.Outputs.LoadBalancerDNS
-        RDSId: !GetAtt AuroraStack.Outputs.DBEndpoint
+        RDSId: !If
+          - UseMySQL
+          - !GetAtt MySQLStack.Outputs.DBEndpoint
+          - !GetAtt AuroraStack.Outputs.DBEndpoint
         AlarmEmail: !Ref AlarmEmail
+
+Conditions:
+  UseMySQL: !Equals [!Ref DatabaseType, mysql]
+  UseAurora: !Equals [!Ref DatabaseType, aurora]
 
 Outputs:
   VpcId:

@@ -15,10 +15,10 @@ Parameters:
   DatabaseName:
     Type: String
     Default: tododb
-  UsePublicSubnets:
+  DBSecurityGroup:
     Type: String
-    Default: "true"
-    AllowedValues: ["true", "false"]
+  BackendDbSecret:
+    Type: String
 
 Resources:
   DBSubnetGroup:
@@ -27,25 +27,18 @@ Resources:
       DBSubnetGroupDescription: "Aurora Subnet Group"
       SubnetIds: !Ref SubnetIds
 
-  DBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: "Aurora DB SG"
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          CidrIp: 0.0.0.0/0   # ⚠️ For demo only! Later restrict to backend SG
-
   AuroraCluster:
     Type: AWS::RDS::DBCluster
     Properties:
       Engine: aurora-mysql
       EngineVersion: "8.0.mysql_aurora.3.05.2"
       DBClusterIdentifier: my-aurora-cluster
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
+      MasterUsername: !Join 
+        - ''
+        - ['{{resolve:secretsmanager:', !Ref BackendDbSecret, ':SecretString:username}}']
+      MasterUserPassword: !Join
+        - ''
+        - ['{{resolve:secretsmanager:', !Ref BackendDbSecret, ':SecretString:password}}']
       DBSubnetGroupName: !Ref DBSubnetGroup
       DatabaseName: !Ref DatabaseName
       VpcSecurityGroupIds:
@@ -53,7 +46,6 @@ Resources:
       StorageEncrypted: true
       BackupRetentionPeriod: 7
       DeletionProtection: false
-      # SkipFinalSnapshot: true # do not create final snapshot
 
   AuroraInstance:
     Type: AWS::RDS::DBInstance
@@ -61,10 +53,7 @@ Resources:
       DBClusterIdentifier: !Ref AuroraCluster
       DBInstanceClass: db.t3.medium
       Engine: aurora-mysql
-      PubliclyAccessible: !If [ UsePublicSubnetCondition, true, false ]
-
-Conditions:
-  UsePublicSubnetCondition: !Equals [ !Ref UsePublicSubnets, "true" ]
+      PubliclyAccessible: false
 
 Outputs:
   DBEndpoint:
