@@ -146,8 +146,8 @@ Resources:
         GitHubConnectionArn: !Ref GitHubConnectionArn
         BackendApiUrl: !GetAtt BackendStack.Outputs.LoadBalancerDNS
         PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
-        CodePipelineRoleFEArn: !GetAtt RolesStack.Outputs.CodePipelineRoleFEArn
-        CodeBuildServiceRoleArn: !GetAtt RolesStack.Outputs.CodeBuildServiceRoleArn
+        CodePipelineRoleFEArn: !GetAtt RolesStack.Outputs.CodePipelineRoleArn
+        CodeBuildServiceRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
 
   MonitoringStack:
     Type: AWS::CloudFormation::Stack

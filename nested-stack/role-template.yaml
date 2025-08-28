@@ -9,9 +9,11 @@ Parameters:
     Type: String
 
 Resources:
+  ## Artifact Bucket
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
     Properties:
+      BucketName: !Sub "${AWS::StackName}-pipeline-artifacts-${AWS::AccountId}-${AWS::Region}"
       VersioningConfiguration:
         Status: Enabled
       PublicAccessBlockConfiguration:
@@ -21,122 +23,8 @@ Resources:
         RestrictPublicBuckets: true
     DeletionPolicy: Retain
 
-  # CodePipeline Role with minimal permissions + codeconnections:UseConnection
+  ## CodePipeline Role (shared for FE + BE)
   CodePipelineRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codepipeline.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: CodeConnectionsUsagePolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - codeconnections:UseConnection
-                  - codestar-connections:UseConnection
-                Resource:
-                  - !Ref GitHubConnectionArn
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
-        - arn:aws:iam::aws:policy/AWSCodeDeployFullAccess
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
-          
-  # IAM Role for EC2 Instance (CodeDeploy)
-  EC2InstanceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
-        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy  
-      Policies:
-        - PolicyName: SecretsManagerAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: SecretsManagerAccess
-                Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                  - ssm:GetParameter
-                  - ssm:GetParameters
-                Resource: 
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"
-                  - !Ref BackendDbSecret
-
-  EC2InstanceProfile:
-      Type: AWS::IAM::InstanceProfile
-      Properties:
-        Roles:
-          - !Ref EC2InstanceRole
-
-   # CodeBuild Role ( CodeBuild access)
-  
-  CodeBuildRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codebuild.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
-      Policies:
-        - PolicyName: CloudWatchLogsAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: arn:aws:logs:ap-south-1:127145910156:log-group:/aws/codebuild/*
-        - PolicyName: S3PipelineArtifactAccess  # <-- NEW policy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectVersion
-                  - s3:GetBucketLocation
-                  - s3:PutObject
-                Resource:
-                  - !Sub "arn:aws:s3:::${PipelineArtifactBucket}/*"
-
-  # CodeDeploy Service Role
-  CodeDeployServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: codedeploy.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
-
-  CodePipelineRoleFE:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-CodePipelineRole"
@@ -147,33 +35,42 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess
-        - arn:aws:iam::aws:policy/AmazonS3FullAccess
       Policies:
-        - PolicyName: CodePipelineInlinePolicy
+        - PolicyName: CodePipelineMinimal
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Sid: UseCodeBuild
+              - Sid: S3Artifacts
                 Effect: Allow
                 Action:
-                  - codebuild:StartBuild
-                  - codebuild:BatchGetBuilds
-                Resource: !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/*"
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                Resource: !Sub "arn:aws:s3:::${PipelineArtifactBucket}/*"
               - Sid: CodeStarConnection
                 Effect: Allow
                 Action:
                   - codestar-connections:UseConnection
                   - codeconnections:UseConnection
                 Resource: !Ref GitHubConnectionArn
-              - Sid: CloudFrontInvalidate
+              - Sid: TriggerCodeBuild
                 Effect: Allow
                 Action:
-                  - cloudfront:CreateInvalidation
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                Resource: !Sub "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/*"
+              - Sid: TriggerCodeDeploy
+                Effect: Allow
+                Action:
+                  - codedeploy:*
+                Resource: "*"
+              - Sid: CloudFrontInvalidate
+                Effect: Allow
+                Action: cloudfront:CreateInvalidation
                 Resource: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
 
-  CodeBuildServiceRole:
+  ## CodeBuild Role
+  CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "${AWS::StackName}-CodeBuildRole"
@@ -185,7 +82,7 @@ Resources:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: CodeBuildBasicPermissions
+        - PolicyName: CodeBuildMinimal
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
@@ -195,56 +92,75 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: arn:aws:logs:*:*:log-group:/aws/codebuild/*
-              - Sid: ReadSourceIfNeeded
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
+              - Sid: S3Artifacts
                 Effect: Allow
                 Action:
                   - s3:GetObject
                   - s3:GetObjectVersion
-                  - s3:GetBucketLocation
                   - s3:PutObject
-                  - s3:PutObjectAcl
-                Resource:
-                  - !Sub "${PipelineArtifactBucket.Arn}/*"
-                  - !GetAtt PipelineArtifactBucket.Arn
-              - Sid: CloudFrontInvalidation
+                Resource: !Sub "arn:aws:s3:::${PipelineArtifactBucket}/*"
+              - Sid: CloudFrontInvalidate
                 Effect: Allow
-                Action:
-                  - cloudfront:CreateInvalidation
+                Action: cloudfront:CreateInvalidation
                 Resource: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
+
+  ## CodeDeploy Service Role
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-CodeDeployRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+
+  ## EC2 Instance Role
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-EC2Role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: SecretsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Ref BackendDbSecret
+
+  ## Instance Profile
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2InstanceRole
 
 Outputs:
   CodePipelineRoleArn:
     Value: !GetAtt CodePipelineRole.Arn
-    Export:
-      Name: CodePipelineRoleArn
-
-  CodePipelineRoleFEArn:
-    Value: !GetAtt CodePipelineRoleFE.Arn
-    Export:
-      Name: CodePipelineRoleFEArn
-
-  EC2InstanceProfileName:
-    Value: !Ref EC2InstanceProfile
-    Export:
-      Name: EC2InstanceProfileName
-  
-  PipelineArtifactBucketName:
-    Value: !Ref PipelineArtifactBucket
-    Export:
-      Name: PipelineArtifactBucketName
-
   CodeBuildRoleArn:
     Value: !GetAtt CodeBuildRole.Arn
-    Export:
-      Name: CodeBuildRoleArn
-
   CodeDeployServiceRoleArn:
     Value: !GetAtt CodeDeployServiceRole.Arn
-    Export:
-      Name: CodeDeployServiceRoleArn
-
-  CodeBuildServiceRoleArn:
-    Value: !GetAtt CodeBuildServiceRole.Arn
-    Export:
-      Name: CodeBuildServiceRoleArn
+  EC2InstanceProfileName:
+    Value: !Ref EC2InstanceProfile
+  PipelineArtifactBucketName:
+    Value: !Ref PipelineArtifactBucket
