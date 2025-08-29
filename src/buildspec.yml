@@ -13,8 +13,8 @@ phases:
   pre_build:
     commands:
       - echo "Starting pre-build..."
-      - "export BUCKET_NAME=$ARTIFACT_BUCKET"
-      - echo "Bucket is: $BUCKET_NAME"
+      - 'export BUCKET_NAME=$ARTIFACT_BUCKET'
+      - 'echo "Bucket is: $BUCKET_NAME"'
 
   build:
     commands:
