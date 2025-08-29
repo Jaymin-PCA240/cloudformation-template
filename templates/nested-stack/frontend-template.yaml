@@ -212,7 +212,7 @@ Resources:
                 Provider: Manual
                 Version: 1
               Configuration:
-                CustomData: "Manual approval required before deploying to S3/CloudFront"
+                CustomData: "Manual approval required before deploying to S3/CloudFront for Frontend"
               RunOrder: 1
         - Name: Deploy
           Actions:
