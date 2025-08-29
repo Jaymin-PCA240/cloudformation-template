@@ -95,6 +95,13 @@ Resources:
                   - codestar-connections:UseConnection
                   - codeconnections:UseConnection
                 Resource: !Ref GitHubConnectionArn
+              - Sid: AllowPassCFNExecutionRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt CloudFormationExecutionRole.Arn
+                Condition:
+                  StringEqualsIfExists:
+                    iam:PassedToService: cloudformation.amazonaws.com
 
   CodeBuildRole:
     Type: AWS::IAM::Role
