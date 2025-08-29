@@ -31,7 +31,7 @@ Parameters:
   GitHubRepo:
     Type: String
     Description: GitHub repo name
-    Default: Jaymin-PCA240/BE-TODO
+    Default: Jaymin-PCA240/cloudformation-template
   GitHubBranch:
     Type: String
     Default: main
@@ -89,6 +89,12 @@ Resources:
                 Action:
                   - cloudformation:*
                 Resource: "*"
+              - Sid: CodeStarConnection
+                Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                  - codeconnections:UseConnection
+                Resource: !Ref GitHubConnectionArn
 
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -113,6 +119,13 @@ Resources:
                 Resource:
                   - !Sub "${ArtifactBucket.Arn}"
                   - !Sub "${ArtifactBucket.Arn}/*"
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -148,7 +161,7 @@ Resources:
                 Provider: CodeStarSourceConnection
                 Version: 1
               OutputArtifacts:
-                - Name: SourceOutput
+                - Name: SourceArtifact
               Configuration:
                 ConnectionArn: !Ref GitHubConnectionArn
                 FullRepositoryId: !Sub "${GitHubRepo}"
@@ -189,6 +202,7 @@ Resources:
               InputArtifacts:
                 - Name: BuildArtifact
               Configuration:
+                ActionMode: CREATE_UPDATE 
                 StackName: MyAppRoot
                 TemplatePath: BuildArtifact::output/root-template.yaml
                 Capabilities: CAPABILITY_NAMED_IAM
