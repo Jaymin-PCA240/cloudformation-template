@@ -19,15 +19,15 @@ phases:
   build:
     commands:
       - echo "Packaging nested stacks..."
-      - aws s3 cp ./templates/nested-stacks/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/security-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/ssm-parameters-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/monitoring-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/backend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/frontend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stacks/role-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/security-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/ssm-parameters-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/monitoring-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/backend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/frontend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates/nested-stack/role-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
       - echo "Nested stacks uploaded successfully."
 
   post_build:
