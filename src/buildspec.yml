@@ -19,7 +19,6 @@ phases:
   build:
     commands:
       - echo "Packaging nested stacks..."
-      # Copy nested templates to S3
       - aws s3 cp ./templates/nested-stacks/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
       - aws s3 cp ./templates/nested-stacks/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
       - aws s3 cp ./templates/nested-stacks/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
@@ -34,9 +33,7 @@ phases:
   post_build:
     commands:
       - echo "Preparing artifacts for CloudFormation..."
-      # Create output folder for pipeline artifacts
       - mkdir -p output
-      # Copy root template into output so pipeline CFN deploys it
       - cp templates/root-template-main.yaml output/
       - echo "Build completed on `date`"
 

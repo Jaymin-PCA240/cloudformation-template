@@ -143,6 +143,7 @@ Resources:
             Value: !Ref ArtifactBucket
       Source:
         Type: CODEPIPELINE
+        BuildSpec: src/buildspec.yml
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
