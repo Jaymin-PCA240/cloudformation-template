@@ -127,6 +127,20 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*"
 
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "CFN-ExecutionRole-${AWS::StackName}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -205,8 +219,9 @@ Resources:
               Configuration:
                 ActionMode: CREATE_UPDATE 
                 StackName: MyAppRoot
-                TemplatePath: BuildArtifact::output/root-template.yaml
+                TemplatePath: BuildArtifact::root-template-main.yaml
                 Capabilities: CAPABILITY_NAMED_IAM
+                RoleArn: !GetAtt CloudFormationExecutionRole.Arn 
                 ParameterOverrides: !Sub |
                   {
                     "ArtifactBucketName"   : "${ArtifactBucket}",
