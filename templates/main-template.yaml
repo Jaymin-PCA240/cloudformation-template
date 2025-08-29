@@ -55,6 +55,15 @@ Resources:
   # S3 bucket for pipeline artifacts + nested templates
   ArtifactBucket:
     Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    DeletionPolicy: Retain
 
   PipelineRole:
     Type: AWS::IAM::Role

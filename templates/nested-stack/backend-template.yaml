@@ -268,7 +268,7 @@ Resources:
                 - Name: BuildOutput
               Configuration:
                 ProjectName: !Ref CodeBuildProject
-        - Name: Approval   # <-- NEW stage
+        - Name: Approval
           Actions:
             - Name: ManualApproval
               ActionTypeId:
