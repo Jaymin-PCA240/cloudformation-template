@@ -13,19 +13,33 @@ Parameters:
     Type: String
   BackendDbSecret:
     Type: String
+  AppName:                      
+    Type: String
+  Environment:                  
+    Type: String
+
 
 Resources:
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: "Aurora Subnet Group"
+      DBSubnetGroupName: !Sub "${AppName}-${Environment}-db-subnetgroup" 
       SubnetIds: !Ref SubnetIds
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-db-subnetgroup"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   AuroraCluster:
     Type: AWS::RDS::DBCluster
     Properties:
       Engine: aurora-mysql
       EngineVersion: "8.0.mysql_aurora.3.05.2"
+      DBClusterIdentifier: !Sub "${AppName}-${Environment}-db-cluster"
       DBClusterIdentifier: my-aurora-cluster
       MasterUsername: !Join 
         - ''
@@ -40,6 +54,13 @@ Resources:
       StorageEncrypted: true
       BackupRetentionPeriod: 7
       DeletionProtection: false
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-db-cluster"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   AuroraInstance:
     Type: AWS::RDS::DBInstance
@@ -48,6 +69,14 @@ Resources:
       DBInstanceClass: db.t3.medium
       Engine: aurora-mysql
       PubliclyAccessible: false
+      DBInstanceIdentifier: !Sub "${AppName}-${Environment}-db-instance" 
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-db-instance"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   DBEndpoint:

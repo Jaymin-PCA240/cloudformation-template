@@ -7,11 +7,16 @@ Parameters:
     Description: ARN of existing CodeStar GitHub connection
   BackendDbSecret:
     Type: String
+  AppName:                      
+    Type: String
+  Environment:                  
+    Type: String
 
 Resources:
   ## Artifact Bucket
   PipelineArtifactBucket:
     Type: AWS::S3::Bucket
+    # BucketName: !Sub "${AppName}-${Environment}-artifact-s3"
     Properties:
       VersioningConfiguration:
         Status: Enabled
@@ -20,13 +25,20 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-artifact-s3"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
     DeletionPolicy: Retain
 
   ## CodePipeline Role (shared for FE + BE)
   CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-CodePipelineRole"
+      RoleName: !Sub "${AppName}-${Environment}-codepipeline-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -34,6 +46,13 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codepipeline-role"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
       Policies:
         - PolicyName: CodePipelineMinimal
           PolicyDocument:
@@ -93,7 +112,7 @@ Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-CodeBuildRole"
+      RoleName: !Sub "${AppName}-${Environment}-codebuild-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -101,6 +120,13 @@ Resources:
             Principal:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                          
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codebuild-role"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
       Policies:
         - PolicyName: CodeBuildMinimal
           PolicyDocument:
@@ -129,7 +155,7 @@ Resources:
   CodeDeployServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-CodeDeployRole"
+      RoleName: !Sub "${AppName}-${Environment}-codedeploy-role" 
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -137,6 +163,13 @@ Resources:
             Principal:
               Service: codedeploy.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                          
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codedeploy-role"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
 
@@ -144,7 +177,7 @@ Resources:
   EC2InstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "${AWS::StackName}-EC2Role"
+      RoleName: !Sub "${AppName}-${Environment}-ec2-role"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -152,6 +185,13 @@ Resources:
             Principal:
               Service: ec2.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                          
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-ec2-role"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
         - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
@@ -170,8 +210,16 @@ Resources:
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
+      InstanceProfileName: !Sub "${AppName}-${Environment}-ec2-instanceprofile" 
       Roles:
         - !Ref EC2InstanceRole
+      Tags:                          
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-ec2-instanceprofile"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   CodePipelineRoleArn:

@@ -11,13 +11,25 @@ Parameters:
     Type: String
   RDSId:
     Type: String
+  AppName:                       
+    Type: String
+  Environment:                   
+    Type: String
+
   
 Resources:
   ### SNS Topic for Notifications ###
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: MonitoringAlarmTopic
+      TopicName: !Sub "${AppName}-${Environment}-monitoring-sns"   # << updated
+      Tags:                                                       # << updated
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-monitoring-sns"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   AlarmSubscription:
     Type: AWS::SNS::Subscription
@@ -30,7 +42,7 @@ Resources:
   ASGHighCPUAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: "ASG-HighCPU"
+      AlarmName: !Sub "${AppName}-${Environment}-asg-highcpu"
       Namespace: "AWS/EC2"
       MetricName: CPUUtilization
       Dimensions:
@@ -45,12 +57,19 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
+      Tags:                                                       # << updated
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-asg-highcpu"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   ### RDS Free Storage Space Alarm ###
   RDSLowStorageAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: "RDS-LowStorage"
+      AlarmName: !Sub "${AppName}-${Environment}-rds-lowstorage"
       Namespace: "AWS/RDS"
       MetricName: FreeStorageSpace
       Dimensions:
@@ -65,12 +84,19 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
+      Tags:                                                       # << updated
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-rds-lowstorage"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environme
 
   ### ALB 5XX Errors Alarm ###
   ALB5XXAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: "ALB-5XX-High"
+      AlarmName: !Sub "${AppName}-${Environment}-alb-5xx" 
       Namespace: "AWS/ApplicationELB"
       MetricName: HTTPCode_ELB_5XX_Count
       Dimensions:
@@ -85,12 +111,19 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
+      Tags:                                                       # << updated
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-alb-5xx"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   ### CloudWatch Dashboard ###
   MonitoringDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: InfraMonitoringDashboard
+      DDashboardName: !Sub "${AppName}-${Environment}-monitoring-dashboard" 
       DashboardBody: !Sub |
         {
           "widgets": [
@@ -144,6 +177,13 @@ Resources:
             }
           ]
         }
+      Tags:                                                       # << updated
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-monitoring-dashboard"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   AlarmTopicArn:

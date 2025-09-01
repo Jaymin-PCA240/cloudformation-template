@@ -5,6 +5,10 @@ Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
     Description: "VPC where resources will be created"
+  AppName:                      
+    Type: String
+  Environment:                  
+    Type: String
 
 Resources:
   
@@ -12,6 +16,7 @@ Resources:
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub "${AppName}-${Environment}-ec2-sg"
       GroupDescription: Allow SSH and app port 8080
       VpcId: !Ref VpcId
       SecurityGroupIngress:
@@ -23,11 +28,19 @@ Resources:
           FromPort: 8080
           ToPort: 8080
           SourceSecurityGroupId: !Ref ALBSecurityGroup
+      Tags:                               
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-ec2-sg"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   # Security Group for ALB (allow HTTP from anywhere)
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub "${AppName}-${Environment}-alb-sg" 
       GroupDescription: Allow HTTP to ALB
       VpcId: !Ref VpcId
       SecurityGroupIngress:
@@ -35,10 +48,18 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+      Tags:                               
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-alb-sg"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub "${AppName}-${Environment}-db-sg" 
       GroupDescription: "Aurora DB SG"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
@@ -46,6 +67,13 @@ Resources:
           FromPort: 3306
           ToPort: 3306
           SourceSecurityGroupId: !Ref EC2SecurityGroup
+      Tags:                               
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-db-sg"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   EC2SecurityGroupId:

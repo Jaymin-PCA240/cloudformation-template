@@ -42,15 +42,25 @@ Parameters:
       - mysql
       - aurora
     Description: "Choose which database to deploy: mysql or aurora"
-  ArtifactBucketName:
+  AppName:                    
     Type: String
-  
+    Default: todo
+    Description: Application short name (used in naming convention)
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment tag (dev|staging|prod)
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
 Resources:
 
   BackendDbSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      # Name: !Sub "${AWS::StackName}-BackendDbSecret"
+      Name: !Sub "${AppName}-${Environment}-db-secret" 
       Description: "Secret for backend RDS database"
       GenerateSecretString:
         SecretStringTemplate: !Sub '{"username": "${DBUsername}" }' 
@@ -58,62 +68,130 @@ Resources:
         PasswordLength: 16
         ExcludeCharacters: '"@/\'
         ExcludePunctuation: true
+      Tags:                                               
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-db-secret"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   SSMParametersStack:
       Type: AWS::CloudFormation::Stack
       Properties:
-        TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/ssm-parameters-template.yaml"
+        StackName: !Sub "${AppName}-${Environment}-ssm-stack"
+        TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/ssm-parameters-template.yaml"
         Parameters:
-          MyDatabaseSecretArn: !Ref BackendDbSecret
+          AppName: !Ref AppName
+          Environment: !Ref Environment
+        Tags:                                                    
+          - Key: Name
+            Value: !Sub "${AppName}-${Environment}-ssm-stack"
+          - Key: AppName
+            Value: !Ref AppName
+          - Key: Environment
+            Value: !Ref Environment
 
   RolesStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/role-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-roles-stack" 
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/role-template.yaml"
       Parameters:
           GitHubConnectionArn: !Ref GitHubConnectionArn
           BackendDbSecret: !Ref BackendDbSecret
+          AppName: !Ref AppName
+          Environment: !Ref Environment
+      Tags:                                                    
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-roles-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   VPCStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/vpc-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-vpc-stack"  
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/vpc-template.yaml""
+      Parameters:
+          AppName: !Ref AppName
+          Environment: !Ref Environment
+      Tags:                                                    
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-vpc-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
   
   SecurityStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/security-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-security-stack"
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/security-template.yaml""
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-security-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   MySQLStack:
     Type: AWS::CloudFormation::Stack
     Condition: UseMySQL
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/mysql-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-mysql-stack" 
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/mysql-template.yaml""
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
         DatabaseName: !Ref DatabaseName
         DBSecurityGroup: !GetAtt SecurityStack.Outputs.DBSecurityGroupId
         BackendDbSecret: !Ref BackendDbSecret
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-mysql-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   AuroraStack:
     Type: AWS::CloudFormation::Stack
     Condition: UseAurora
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/aurora-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-aurora-stack" 
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/aurora-template.yaml""
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
         DatabaseName: !Ref DatabaseName
         DBSecurityGroup: !GetAtt SecurityStack.Outputs.DBSecurityGroupId
         BackendDbSecret: !Ref BackendDbSecret
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-aurora-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   BackendStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/backend-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-backend-stack" 
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/backend-template.yaml""
       Parameters:
         VPCId: !GetAtt VPCStack.Outputs.VpcId
         PublicSubnetId1: !GetAtt VPCStack.Outputs.PublicSubnet1
@@ -137,11 +215,21 @@ Resources:
         CodeBuildRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
         CodeDeployServiceRoleArn: !GetAtt RolesStack.Outputs.CodeDeployServiceRoleArn
         PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-backend-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   FrontendStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/frontend-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-frontend-stack"
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/frontend-template.yaml""
       Parameters:
         GitHubRepo: !Ref GitHubRepoFE
         GitHubBranch: !Ref GitHubBranchFE
@@ -150,11 +238,21 @@ Resources:
         PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
         CodePipelineRoleFEArn: !GetAtt RolesStack.Outputs.CodePipelineRoleArn
         CodeBuildServiceRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   MonitoringStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/monitoring-template.yaml"
+      StackName: !Sub "${AppName}-${Environment}-monitoring-stack"
+      TemplateURL: "!Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/monitoring-template.yaml""
       Parameters:
         MyASG: !GetAtt BackendStack.Outputs.AutoScalingGroupName
         ALBDNS: !GetAtt BackendStack.Outputs.LoadBalancerDNS
@@ -163,6 +261,16 @@ Resources:
           - !GetAtt MySQLStack.Outputs.DBEndpoint
           - !GetAtt AuroraStack.Outputs.DBEndpoint
         AlarmEmail: !Ref AlarmEmail
+        AppName: !Ref AppName
+        Environment: !Ref Environment
+      Tags:                                                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-monitoring-stack"
+        - Key: AppName
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
+        
 
 Conditions:
   UseMySQL: !Equals [!Ref DatabaseType, mysql]

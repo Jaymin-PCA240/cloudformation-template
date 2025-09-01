@@ -26,6 +26,10 @@ Parameters:
     Type: String
   CodeBuildServiceRoleArn:
     Type: String
+  AppName:
+    Type: String
+  Environment:
+    Type: String
 
 Resources:
 
@@ -39,17 +43,31 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-s3"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
     DeletionPolicy: Retain
 
   FrontendOAC:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub "${AWS::StackName}-OAC"
+        Name: !Sub "${AppName}-${Environment}-frontend-oac"
         Description: "OAC for CloudFront to access S3 bucket"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
+        Tags:                                
+          - Key: Name
+            Value: !Sub "${AppName}-${Environment}-frontend-oac"
+          - Key: Application
+            Value: !Ref AppName
+          - Key: Environment
+            Value: !Ref Environment
 
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
@@ -57,6 +75,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: !Ref CloudFrontDefaultRootObject
+        Comment: !Sub "${AppName}-${Environment}-frontend-distribution"
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt FrontendBucket.RegionalDomainName
@@ -103,6 +122,13 @@ Resources:
             ResponsePagePath: /index.html
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-distribution"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -124,7 +150,7 @@ Resources:
   FrontendCodeBuild:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub "${AWS::StackName}-FrontendBuild"
+      Name: !Sub "${AppName}-${Environment}-frontend-build"
       ServiceRole: !Ref CodeBuildServiceRoleArn
       Artifacts:
         Type: CODEPIPELINE
@@ -136,15 +162,21 @@ Resources:
           - Name: API_BASE_URL
             Value: !Ref BackendApiUrl
             Type: PLAINTEXT
-
       Source:
         Type: CODEPIPELINE
       TimeoutInMinutes: 30
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-build"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   CloudFrontInvalidationProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub "${AWS::StackName}-CloudFrontInvalidation"
+      Name: !Sub "${AppName}-${Environment}-frontend-invalidation"
       ServiceRole: !Ref CodeBuildServiceRoleArn
       Artifacts:
         Type: CODEPIPELINE   # must be CODEPIPELINE when Source.Type is CODEPIPELINE
@@ -165,11 +197,18 @@ Resources:
                 - echo "Invalidating CloudFront cache..."
                 - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
       TimeoutInMinutes: 10
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-invalidation"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   FrontendPipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Sub "${AWS::StackName}-FrontendPipeline"
+      Name: !Sub "${AppName}-${Environment}-frontend-pipeline"
       RoleArn: !Ref CodePipelineRoleFEArn
       ArtifactStore:
         Type: S3
@@ -239,6 +278,13 @@ Resources:
               Configuration:
                 ProjectName: !Ref CloudFrontInvalidationProject
               RunOrder: 2
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-pipeline"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   FrontendBucketName:

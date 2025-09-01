@@ -58,6 +58,10 @@ Parameters:
     Type: String
   PipelineArtifactBucketName:
     Type: String
+  AppName:                       
+    Type: String
+  Environment:                   
+    Type: String
 
 Resources:
   
@@ -65,7 +69,7 @@ Resources:
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "node-alb"
+      Name: !Sub "${AppName}-${Environment}-node-alb" 
       Subnets:
         - !Ref PublicSubnetId1
         - !Ref PublicSubnetId2
@@ -73,12 +77,19 @@ Resources:
         - !Ref ALBSecurityGroup
       Scheme: internet-facing
       Type: application
+      Tags:                                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-node-alb"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   # Target Group for ALB
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      # Name: !Sub "${GitHubRepo}-TG"
+      Name: !Sub "${AppName}-${Environment}-node-tg"
       Port: 8080
       Protocol: HTTP
       VpcId: !Ref VPCId
@@ -88,6 +99,13 @@ Resources:
       HealthCheckTimeoutSeconds: 10  
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 5
+      Tags:                                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-node-tg"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   # ALB Listener on port 80
   ALBListener:
@@ -104,6 +122,7 @@ Resources:
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
+      LaunchTemplateName: !Sub "${AppName}-${Environment}-ec2-lt" 
       LaunchTemplateData:
         ImageId: !Ref LatestAL2023Ami # Amazon Linux 2 Mumbai
         InstanceType: t3.micro
@@ -175,6 +194,7 @@ Resources:
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
+      AutoScalingGroupName: !Sub "${AppName}-${Environment}-node-asg" 
       VPCZoneIdentifier:
         - !Ref PrivateSubnetId1
         - !Ref PrivateSubnetId2
@@ -188,7 +208,13 @@ Resources:
         - !Ref TargetGroup
       Tags:
         - Key: Name
-          Value: !Sub "${GitHubRepo}-ASG"
+          Value: !Sub "${AppName}-${Environment}-node-asg"
+          PropagateAtLaunch: true
+        - Key: Application
+          Value: !Ref AppName
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Environment
           PropagateAtLaunch: true
       HealthCheckType: ELB
       HealthCheckGracePeriod: 600
@@ -198,6 +224,14 @@ Resources:
     Type: AWS::CodeDeploy::Application
     Properties:
       ComputePlatform: Server
+      ApplicationName: !Sub "${AppName}-${Environment}-codedeploy-app"
+      Tags:
+      - Key: Name
+        Value: !Sub "${AppName}-${Environment}-codedeploy-app"
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Project
+        Value: !Ref AppName
 
   # CodeDeploy Deployment Group for ASG and ALB
   CodeDeployDeploymentGroup:
@@ -205,7 +239,7 @@ Resources:
     DependsOn: CodeDeployApp
     Properties:
       ApplicationName: !Ref CodeDeployApp
-      DeploymentGroupName: !Sub "DeploymentGroup"
+      DeploymentGroupName: !Sub "${AppName}-${Environment}-deployment-group" 
       ServiceRoleArn: !Ref CodeDeployServiceRoleArn
       AutoScalingGroups:
         - !Ref AutoScalingGroup
@@ -218,7 +252,7 @@ Resources:
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: !Sub "BuildProject"
+      Name: !Sub "${AppName}-${Environment}-codebuild"
       ServiceRole: !Ref CodeBuildRoleArn
       Artifacts:
         Type: CODEPIPELINE
@@ -230,11 +264,19 @@ Resources:
       Source:
         Type: CODEPIPELINE
       TimeoutInMinutes: 30
+      Tags:                                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codebuild"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   # CodePipeline Definition
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
+      Name: !Sub "${AppName}-${Environment}-codepipeline" 
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
@@ -292,6 +334,13 @@ Resources:
               Configuration:
                 ApplicationName: !Ref CodeDeployApp
                 DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-codepipeline"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref AppName
 
 Outputs:
   LoadBalancerDNS:

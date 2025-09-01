@@ -12,7 +12,7 @@ Parameters:
 
   AllowedSSHLocation:
     Type: String
-    Default: "203.0.113.0/32"
+    Default: "0.0.0.0/0"
     Description: "CIDR from which SSH is allowed"
 
   EC2KeyPair:

@@ -29,10 +29,10 @@ Parameters:
     Type: String
     Default: dev
     Description: Environment tag (dev|staging|prod)
-  ProjectTag:
+  AppName:                    
     Type: String
-    Default: todo-app
-    Description: Project tag
+    Default: todo
+    Description: Application short name (used in naming convention)
 
 Resources:
   VPC:
@@ -43,18 +43,22 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-vpc'
+          Value: !Sub '${AppName}-${Environment}-network-vpc' 
         - Key: Environment
           Value: !Ref Environment
-        - Key: Project
-          Value: !Ref ProjectTag
+        - Key: Application
+          Value: !Ref AppName
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-igw'
+          Value: !Sub '${AppName}-${Environment}-network-igw' 
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   VpcGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -68,7 +72,11 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-public-rt'
+          Value: !Sub '${AppName}-${Environment}-public-rt'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   PublicRoute:
     Type: AWS::EC2::Route
@@ -87,9 +95,11 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-public-1'
+          Value: !Sub '${AppName}-${Environment}-public-subnet-1'
         - Key: Environment
           Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   PublicSubnet2:
     Type: AWS::EC2::Subnet
@@ -100,9 +110,11 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-public-2'
+          Value: !Sub '${AppName}-${Environment}-public-subnet-2'
         - Key: Environment
           Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -126,9 +138,11 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-private-1'
+          Value: !Sub '${AppName}-${Environment}-private-subnet-1'
         - Key: Environment
           Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
@@ -139,14 +153,23 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Sub '${ProjectTag}-${Environment}-private-2'
+          Value: !Sub '${AppName}-${Environment}-private-subnet-2'
         - Key: Environment
           Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   NatEIP:
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-network-natgw-eip" 
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   NatGateway:
     Type: AWS::EC2::NatGateway
@@ -155,7 +178,11 @@ Resources:
       SubnetId: !Ref PublicSubnet1   # NAT Gateway only in AZ1
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-NatGateway"
+          Value: !Sub "${AppName}-${Environment}-network-natgw" 
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   # One Private Route Table for both subnets
   PrivateRouteTable:
@@ -164,7 +191,11 @@ Resources:
       VpcId: !Ref VPC
       Tags:
         - Key: Name
-          Value: !Sub "${AWS::StackName}-PrivateRouteTable"
+          Value: !Sub "${AppName}-${Environment}-private-rt"  
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   PrivateRoute:
     Type: AWS::EC2::Route

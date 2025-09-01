@@ -50,6 +50,18 @@ Parameters:
       - mysql
       - aurora
     Description: "Choose which database to deploy: mysql or aurora"
+  AppName:                    
+    Type: String
+    Default: todo
+    Description: Application short name (used in naming convention)
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment tag (dev|staging|prod)
+    AllowedValues:
+      - dev
+      - staging
+      - prod
 
 Resources:
   # S3 bucket for pipeline artifacts + nested templates
@@ -63,11 +75,19 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-artifact-bucket"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
     DeletionPolicy: Retain
 
   PipelineRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${AppName}-${Environment}-stack-PipelineRole" 
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -75,6 +95,13 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-PipelineRole"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
       Policies:
         - PolicyName: PipelinePolicy
           PolicyDocument:
@@ -115,6 +142,7 @@ Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: !Sub "${AppName}-${Environment}-stack-CodeBuildRole"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -122,6 +150,13 @@ Resources:
             Principal:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-CodeBuildRole"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
       Policies:
         - PolicyName: BuildPolicy
           PolicyDocument:
@@ -146,7 +181,7 @@ Resources:
   CloudFormationExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "CFN-ExecutionRole-${AWS::StackName}"
+      RoleName: !Sub "${AppName}-${Environment}-stack-CFNExecRole"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -154,13 +189,20 @@ Resources:
             Principal:
               Service: cloudformation.amazonaws.com
             Action: sts:AssumeRole
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-CFNExecRole"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
 
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: MyAppBuild
+      Name: !Sub "${AppName}-${Environment}-stack-CodeBuildProject" 
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -174,10 +216,18 @@ Resources:
       Source:
         Type: CODEPIPELINE
         BuildSpec: src/buildspec.yml
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-CodeBuildProject"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
+      Name: !Sub "${AppName}-${Environment}-stack-Pipeline"
       RoleArn: !GetAtt PipelineRole.Arn
       ArtifactStore:
         Type: S3
@@ -250,8 +300,17 @@ Resources:
                     "GitHubBranchFE"       : "${GitHubBranchFE}",
                     "GitHubConnectionArn"  : "${GitHubConnectionArn}",
                     "AlarmEmail"           : "${AlarmEmail}",
-                    "DatabaseType"         : "${DatabaseType}"
+                    "DatabaseType"         : "${DatabaseType}",
+                    "AppName"              : "${AppName}"
+                    "Environment"          : "${Environment}"
                   }
+      Tags:                        
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-stack-Pipeline"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
 
 Outputs:
   ArtifactBucketName:
@@ -308,3 +367,13 @@ Outputs:
     Value: !Ref DatabaseType
     Export:
       Name: DatabaseType
+
+  AppName:
+    Value: !Ref AppName
+    Export:
+      Name: AppName
+
+  Environment:
+    Value: !Ref Environment
+    Export:
+      Name: Environment
