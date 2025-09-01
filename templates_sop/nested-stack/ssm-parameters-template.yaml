@@ -38,13 +38,10 @@ Resources:
             "force_flush_interval": 15
           }
         }
-      Tags:                     
-        - Key: Name
-          Value: !Sub "${AppName}-${Environment}-ec2-ssmparam"
-        - Key: Application
-          Value: !Ref AppName
-        - Key: Environment
-          Value: !Ref Environment
+      Tags:
+        Name: !Sub "${AppName}-${Environment}-ec2-ssmparam"
+        Application: !Ref AppName
+        Environment: !Ref Environment
 
 Outputs:
   CloudWatchAgentConfigParam:
