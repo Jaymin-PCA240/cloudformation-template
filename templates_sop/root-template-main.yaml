@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Root Stack — VPC + Aurora MySQL (Nested Stacks)"
+
+Parameters:
+  DBUsername:
+    Type: String
+    Default: admin
+    Description: "Aurora master username"
+  DatabaseName:
+    Type: String
+    Default: tododb
+  EC2KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Existing EC2 KeyPair name for SSH access
+  GitHubRepoBE:
+    Type: String
+    Description: GitHub repo name for BE
+    Default: Jaymin-PCA240/BE-TODO
+  GitHubBranchBE:
+    Type: String
+    Default: main
+    Description: Branch to build for BE
+  GitHubRepoFE:
+    Type: String
+    Description: GitHub repo name for FE
+    Default: Jaymin-PCA240/FE-TODO
+  GitHubBranchFE:
+    Type: String
+    Default: main
+    Description: Branch to build for FE
+  GitHubConnectionArn:
+    Type: String
+    Description: ARN of existing CodeStar GitHub connection
+    Default: arn:aws:codeconnections:ap-south-1:127145910156:connection/1db5596b-8712-48b6-aad2-062695c51177
+  AlarmEmail:
+    Type: String
+    Description: Email address to receive alarm notifications
+  DatabaseType:
+    Type: String
+    Default: mysql
+    AllowedValues:
+      - mysql
+      - aurora
+    Description: "Choose which database to deploy: mysql or aurora"
+  ArtifactBucketName:
+    Type: String
+  
+Resources:
+
+  BackendDbSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      # Name: !Sub "${AWS::StackName}-BackendDbSecret"
+      Description: "Secret for backend RDS database"
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username": "${DBUsername}" }' 
+        GenerateStringKey: "password"              
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+        ExcludePunctuation: true
+
+  SSMParametersStack:
+      Type: AWS::CloudFormation::Stack
+      Properties:
+        TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/ssm-parameters-template.yaml"
+        Parameters:
+          MyDatabaseSecretArn: !Ref BackendDbSecret
+
+  RolesStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/role-template.yaml"
+      Parameters:
+          GitHubConnectionArn: !Ref GitHubConnectionArn
+          BackendDbSecret: !Ref BackendDbSecret
+
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/vpc-template.yaml"
+  
+  SecurityStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/security-template.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+
+  MySQLStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: UseMySQL
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/mysql-template.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
+        DatabaseName: !Ref DatabaseName
+        DBSecurityGroup: !GetAtt SecurityStack.Outputs.DBSecurityGroupId
+        BackendDbSecret: !Ref BackendDbSecret
+
+  AuroraStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: UseAurora
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/aurora-template.yaml"
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
+        DatabaseName: !Ref DatabaseName
+        DBSecurityGroup: !GetAtt SecurityStack.Outputs.DBSecurityGroupId
+        BackendDbSecret: !Ref BackendDbSecret
+
+  BackendStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/backend-template.yaml"
+      Parameters:
+        VPCId: !GetAtt VPCStack.Outputs.VpcId
+        PublicSubnetId1: !GetAtt VPCStack.Outputs.PublicSubnet1
+        PublicSubnetId2: !GetAtt VPCStack.Outputs.PublicSubnet2
+        PrivateSubnetId1: !GetAtt VPCStack.Outputs.PrivateSubnet1
+        PrivateSubnetId2: !GetAtt VPCStack.Outputs.PrivateSubnet2
+        EC2KeyPair: !Ref EC2KeyPair
+        DatabaseEndpoint: !If
+          - UseMySQL
+          - !GetAtt MySQLStack.Outputs.DBEndpoint
+          - !GetAtt AuroraStack.Outputs.DBEndpoint
+        DatabaseName: !Ref DatabaseName
+        GitHubRepo: !Ref GitHubRepoBE
+        GitHubBranch: !Ref GitHubBranchBE
+        GitHubConnectionArn: !Ref GitHubConnectionArn
+        EC2SecurityGroup: !GetAtt SecurityStack.Outputs.EC2SecurityGroupId
+        ALBSecurityGroup: !GetAtt SecurityStack.Outputs.ALBSecurityGroupId
+        BackendDbSecret: !Ref BackendDbSecret
+        CodePipelineRoleArn: !GetAtt RolesStack.Outputs.CodePipelineRoleArn
+        EC2InstanceProfileName: !GetAtt RolesStack.Outputs.EC2InstanceProfileName
+        CodeBuildRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
+        CodeDeployServiceRoleArn: !GetAtt RolesStack.Outputs.CodeDeployServiceRoleArn
+        PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
+
+  FrontendStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/frontend-template.yaml"
+      Parameters:
+        GitHubRepo: !Ref GitHubRepoFE
+        GitHubBranch: !Ref GitHubBranchFE
+        GitHubConnectionArn: !Ref GitHubConnectionArn
+        BackendApiUrl: !GetAtt BackendStack.Outputs.LoadBalancerDNS
+        PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
+        CodePipelineRoleFEArn: !GetAtt RolesStack.Outputs.CodePipelineRoleArn
+        CodeBuildServiceRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
+
+  MonitoringStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.${AWS::Region}.amazonaws.com/monitoring-template.yaml"
+      Parameters:
+        MyASG: !GetAtt BackendStack.Outputs.AutoScalingGroupName
+        ALBDNS: !GetAtt BackendStack.Outputs.LoadBalancerDNS
+        RDSId: !If
+          - UseMySQL
+          - !GetAtt MySQLStack.Outputs.DBEndpoint
+          - !GetAtt AuroraStack.Outputs.DBEndpoint
+        AlarmEmail: !Ref AlarmEmail
+
+Conditions:
+  UseMySQL: !Equals [!Ref DatabaseType, mysql]
+  UseAurora: !Equals [!Ref DatabaseType, aurora]
+
+Outputs:
+  VpcId:
+    Value: !GetAtt VPCStack.Outputs.VpcId
+    Export:
+      Name: RootVpcId
+
+  BackendStack:
+    Value: !GetAtt BackendStack.Outputs.LoadBalancerDNS
+    Export:
+      Name: RootLoadBalancerDNS
+
+  PublicSubnets:
+    Value: !GetAtt VPCStack.Outputs.PublicSubnetIds
+    Export:
+      Name: RootPublicSubnets
+  
+  FrontendStack:
+    Value: !GetAtt FrontendStack.Outputs.CloudFrontDomain
+    Export:
+      Name: RootCloudFrontDomain
+
+  
