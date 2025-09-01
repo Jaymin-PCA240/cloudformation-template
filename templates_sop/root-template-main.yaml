@@ -81,7 +81,6 @@ Resources:
   SSMParametersStack:
       Type: AWS::CloudFormation::Stack
       Properties:
-        StackName: !Sub "${AppName}-${Environment}-ssm-stack"
         TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/ssm-parameters-template.yaml"
         Parameters:
           AppName: !Ref AppName
@@ -97,7 +96,6 @@ Resources:
   RolesStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-roles-stack" 
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/role-template.yaml"
       Parameters:
           GitHubConnectionArn: !Ref GitHubConnectionArn
@@ -115,7 +113,6 @@ Resources:
   VPCStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-vpc-stack"  
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/vpc-template.yaml"
       Parameters:
           AppName: !Ref AppName
@@ -131,7 +128,6 @@ Resources:
   SecurityStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-security-stack"
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/security-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
@@ -149,7 +145,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Condition: UseMySQL
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-mysql-stack" 
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/mysql-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
@@ -171,7 +166,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Condition: UseAurora
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-aurora-stack" 
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/aurora-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
@@ -192,7 +186,6 @@ Resources:
   BackendStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-backend-stack" 
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/backend-template.yaml"
       Parameters:
         VPCId: !GetAtt VPCStack.Outputs.VpcId
@@ -230,7 +223,6 @@ Resources:
   FrontendStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-frontend-stack"
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/frontend-template.yaml"
       Parameters:
         GitHubRepo: !Ref GitHubRepoFE
@@ -253,7 +245,6 @@ Resources:
   MonitoringStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      StackName: !Sub "${AppName}-${Environment}-monitoring-stack"
       TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/monitoring-template.yaml"
       Parameters:
         MyASG: !GetAtt BackendStack.Outputs.AutoScalingGroupName
