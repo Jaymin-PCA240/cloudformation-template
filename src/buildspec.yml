@@ -19,22 +19,22 @@ phases:
   build:
     commands:
       - echo "Packaging nested stacks..."
-      - aws s3 cp ./templates/nested-stack/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/security-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/ssm-parameters-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/monitoring-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/backend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/frontend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
-      - aws s3 cp ./templates/nested-stack/role-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/mysql-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/aurora-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/vpc-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/security-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/ssm-parameters-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/monitoring-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/backend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/frontend-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
+      - aws s3 cp ./templates_sop/nested-stack/role-template.yaml s3://$BUCKET_NAME/ --region $AWS_DEFAULT_REGION
       - echo "Nested stacks uploaded successfully."
 
   post_build:
     commands:
       - echo "Preparing artifacts for CloudFormation..."
       - mkdir -p output
-      - cp templates/root-template-main.yaml output/
+      - cp templates_sop/root-template-main.yaml output/
       - echo "Build completed on `date`"
 
 artifacts:

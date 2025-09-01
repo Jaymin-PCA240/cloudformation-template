@@ -301,7 +301,7 @@ Resources:
                     "GitHubConnectionArn"  : "${GitHubConnectionArn}",
                     "AlarmEmail"           : "${AlarmEmail}",
                     "DatabaseType"         : "${DatabaseType}",
-                    "AppName"              : "${AppName}"
+                    "AppName"              : "${AppName}",
                     "Environment"          : "${Environment}"
                   }
       Tags:                        
