@@ -42,6 +42,8 @@ Parameters:
       - mysql
       - aurora
     Description: "Choose which database to deploy: mysql or aurora"
+  ArtifactBucketName:
+    Type: String
   AppName:                    
     Type: String
     Default: todo
@@ -114,7 +116,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       StackName: !Sub "${AppName}-${Environment}-vpc-stack"  
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/vpc-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/vpc-template.yaml"
       Parameters:
           AppName: !Ref AppName
           Environment: !Ref Environment
@@ -130,7 +132,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       StackName: !Sub "${AppName}-${Environment}-security-stack"
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/security-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/security-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         AppName: !Ref AppName
@@ -148,7 +150,7 @@ Resources:
     Condition: UseMySQL
     Properties:
       StackName: !Sub "${AppName}-${Environment}-mysql-stack" 
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/mysql-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/mysql-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
@@ -170,7 +172,7 @@ Resources:
     Condition: UseAurora
     Properties:
       StackName: !Sub "${AppName}-${Environment}-aurora-stack" 
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/aurora-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/aurora-template.yaml"
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
@@ -191,7 +193,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       StackName: !Sub "${AppName}-${Environment}-backend-stack" 
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/backend-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/backend-template.yaml"
       Parameters:
         VPCId: !GetAtt VPCStack.Outputs.VpcId
         PublicSubnetId1: !GetAtt VPCStack.Outputs.PublicSubnet1
@@ -229,7 +231,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       StackName: !Sub "${AppName}-${Environment}-frontend-stack"
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/frontend-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/frontend-template.yaml"
       Parameters:
         GitHubRepo: !Ref GitHubRepoFE
         GitHubBranch: !Ref GitHubBranchFE
@@ -252,7 +254,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       StackName: !Sub "${AppName}-${Environment}-monitoring-stack"
-      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/monitoring-template.yaml""
+      TemplateURL: !Sub "https://${ArtifactBucketName}.s3.ap-south-1.amazonaws.com/monitoring-template.yaml"
       Parameters:
         MyASG: !GetAtt BackendStack.Outputs.AutoScalingGroupName
         ALBDNS: !GetAtt BackendStack.Outputs.LoadBalancerDNS
