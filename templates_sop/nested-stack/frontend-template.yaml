@@ -61,13 +61,6 @@ Resources:
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
-        Tags:                                
-          - Key: Name
-            Value: !Sub "${AppName}-${Environment}-frontend-oac"
-          - Key: Application
-            Value: !Ref AppName
-          - Key: Environment
-            Value: !Ref Environment
 
   FrontendDistribution:
     Type: AWS::CloudFront::Distribution
@@ -122,6 +115,13 @@ Resources:
             ResponsePagePath: /index.html
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
+      Tags:                                
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-frontend-distribution"
+        - Key: Application
+          Value: !Ref AppName
+        - Key: Environment
+          Value: !Ref Environment
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy

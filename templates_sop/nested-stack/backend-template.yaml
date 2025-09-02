@@ -276,7 +276,7 @@ Resources:
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
-      Name: !Sub "${AppName}-${Environment}-codepipeline" 
+      Name: !Sub "${AppName}-${Environment}-backend-codepipeline" 
       RoleArn: !Ref CodePipelineRoleArn
       ArtifactStore:
         Type: S3
