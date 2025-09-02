@@ -209,7 +209,9 @@ Resources:
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParameters
-                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/ec2/cloudwatch/agent/*"
+                  - ssm:GetParametersByPath
+                  - ssm:DescribeParameters
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/*"
 
   ## Instance Profile
   EC2InstanceProfile:
