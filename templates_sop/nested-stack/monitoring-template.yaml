@@ -90,7 +90,7 @@ Resources:
         - Key: Application
           Value: !Ref AppName
         - Key: Environment
-          Value: !Ref Environme
+          Value: !Ref Environment
 
   ### ALB 5XX Errors Alarm ###
   ALB5XXAlarm:
