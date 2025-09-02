@@ -181,10 +181,11 @@ Resources:
 
             aws ssm get-parameter \
               --name "/ec2/cloudwatch/agent/config" \
-              --region ${AWS::Region} \
               --with-decryption \
+              --region ap-south-1 \
               --query "Parameter.Value" \
-              --output text > /opt/aws/amazon-cloudwatch-agent/bin/config.json
+              --output text | sudo tee /opt/aws/amazon-cloudwatch-agent/bin/config.json > /dev/null
+
 
             # Start CloudWatch Agent
             /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
