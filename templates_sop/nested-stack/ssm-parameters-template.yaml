@@ -23,13 +23,15 @@ Resources:
                     "file_path": "/home/ec2-user/app/logs/*.log",
                     "log_group_name": "/ec2/backend/logs",
                     "log_stream_name": "{instance_id}/backend",
-                    "timezone": "UTC"
+                    "timezone": "UTC",
+                    "auto_create_group": true
                   },
                   {
                     "file_path": "/home/ec2-user/.pm2/logs/*.log",
                     "log_group_name": "/ec2/pm2/logs",
                     "log_stream_name": "{instance_id}/pm2",
-                    "timezone": "UTC"
+                    "timezone": "UTC",
+                    "auto_create_group": true
                   }
                 ]
               }
