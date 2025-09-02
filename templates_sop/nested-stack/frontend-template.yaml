@@ -122,13 +122,6 @@ Resources:
             ResponsePagePath: /index.html
         ViewerCertificate:
           CloudFrontDefaultCertificate: true
-      Tags:                                
-        - Key: Name
-          Value: !Sub "${AppName}-${Environment}-frontend-distribution"
-        - Key: Application
-          Value: !Ref AppName
-        - Key: Environment
-          Value: !Ref Environment
 
   FrontendBucketPolicy:
     Type: AWS::S3::BucketPolicy

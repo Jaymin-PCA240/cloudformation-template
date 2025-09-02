@@ -177,13 +177,6 @@ Resources:
             }
           ]
         }
-      Tags:                                                       
-        - Key: Name
-          Value: !Sub "${AppName}-${Environment}-monitoring-dashboard"
-        - Key: Application
-          Value: !Ref AppName
-        - Key: Environment
-          Value: !Ref Environment
 
 Outputs:
   AlarmTopicArn:
