@@ -22,8 +22,8 @@ Resources:
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: !Sub "${AppName}-${Environment}-monitoring-sns"   # << updated
-      Tags:                                                       # << updated
+      TopicName: !Sub "${AppName}-${Environment}-monitoring-sns"   
+      Tags:                                                       
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-monitoring-sns"
         - Key: Application
@@ -57,7 +57,7 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
-      Tags:                                                       # << updated
+      Tags:                                                       
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-asg-highcpu"
         - Key: Application
@@ -84,7 +84,7 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
-      Tags:                                                       # << updated
+      Tags:                                                       
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-rds-lowstorage"
         - Key: Application
@@ -111,7 +111,7 @@ Resources:
         - !Ref AlarmTopic
       OKActions:
         - !Ref AlarmTopic
-      Tags:                                                       # << updated
+      Tags:                                                       
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-alb-5xx"
         - Key: Application
@@ -123,7 +123,7 @@ Resources:
   MonitoringDashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DDashboardName: !Sub "${AppName}-${Environment}-monitoring-dashboard" 
+      DashboardName: !Sub "${AppName}-${Environment}-monitoring-dashboard" 
       DashboardBody: !Sub |
         {
           "widgets": [
@@ -177,7 +177,7 @@ Resources:
             }
           ]
         }
-      Tags:                                                       # << updated
+      Tags:                                                       
         - Key: Name
           Value: !Sub "${AppName}-${Environment}-monitoring-dashboard"
         - Key: Application
