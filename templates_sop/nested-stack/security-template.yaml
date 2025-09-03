@@ -79,6 +79,7 @@ Resources:
   BastionSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      GroupName: !Sub "${AppName}-${Environment}-bastion-sg" 
       GroupDescription: "Security group for Bastion Host"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
