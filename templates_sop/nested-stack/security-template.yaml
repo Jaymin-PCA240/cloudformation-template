@@ -23,7 +23,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 22
           ToPort: 22
-          CidrIp: 0.0.0.0/0
+          SourceSecurityGroupId: !Ref BastionSG
         - IpProtocol: tcp
           FromPort: 8080
           ToPort: 8080
@@ -75,6 +75,25 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # Security Group for Bastion
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Security group for Bastion Host"
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-bastion-sg"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
+
 Outputs:
   EC2SecurityGroupId:
     Value: !Ref EC2SecurityGroup
@@ -90,3 +109,8 @@ Outputs:
     Value: !Ref DBSecurityGroup
     Export:
       Name: !Sub "${AWS::StackName}-DBSG"
+
+  BastionSG:
+    Value: !Ref BastionSG
+    Export:
+      Name: !Sub "${AWS::StackName}-BHSG"

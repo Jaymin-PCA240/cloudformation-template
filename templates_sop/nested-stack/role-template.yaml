@@ -221,6 +221,35 @@ Resources:
       Roles:
         - !Ref EC2InstanceRole
 
+  # IAM Role for Bastion (SSM access)
+  BastionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-bastion-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-bastion-role"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${AppName}-${Environment}-bastion-instanceprofile"
+      Roles:
+        - !Ref BastionRole
+
 Outputs:
   CodePipelineRoleArn:
     Value: !GetAtt CodePipelineRole.Arn
@@ -230,5 +259,7 @@ Outputs:
     Value: !GetAtt CodeDeployServiceRole.Arn
   EC2InstanceProfileName:
     Value: !Ref EC2InstanceProfile
+  BastionInstanceProfileName:
+    Value: !Ref BastionInstanceProfile
   PipelineArtifactBucketName:
     Value: !Ref PipelineArtifactBucket

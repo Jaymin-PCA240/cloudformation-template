@@ -210,6 +210,8 @@ Resources:
         CodeBuildRoleArn: !GetAtt RolesStack.Outputs.CodeBuildRoleArn
         CodeDeployServiceRoleArn: !GetAtt RolesStack.Outputs.CodeDeployServiceRoleArn
         PipelineArtifactBucketName: !GetAtt RolesStack.Outputs.PipelineArtifactBucketName
+        BastionInstanceProfile: !GetAtt RolesStack.Outputs.BastionInstanceProfileName
+        BastionSG: !GetAtt SecurityStack.Outputs.BastionSG
         AppName: !Ref AppName
         Environment: !Ref Environment
       Tags:                                                        

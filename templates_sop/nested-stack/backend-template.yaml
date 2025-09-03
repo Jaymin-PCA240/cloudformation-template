@@ -58,6 +58,10 @@ Parameters:
     Type: String
   PipelineArtifactBucketName:
     Type: String
+  BastionInstanceProfile:
+    Type: String
+  BastionSG:
+    Type: String
   AppName:                       
     Type: String
   Environment:                   
@@ -220,6 +224,19 @@ Resources:
       HealthCheckType: ELB
       HealthCheckGracePeriod: 600
 
+   # Scaling Policy for ASG - CPU > 70%
+ 
+  ASGScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: 70.0
+        DisableScaleIn: false
+
   # CodeDeploy Application
   CodeDeployApp:
     Type: AWS::CodeDeploy::Application
@@ -341,6 +358,25 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
+          Value: !Ref AppName
+
+  # Bastion Host EC2
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      KeyName: !Ref EC2KeyPair
+      ImageId: !Ref LatestAL2023Ami
+      SubnetId: !Ref PublicSubnetId1
+      SecurityGroupIds:
+        - !Ref BastionSG
+      IamInstanceProfile: !Ref BastionInstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-${Environment}-bastion-ec2"
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
           Value: !Ref AppName
 
 Outputs:
